@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"go.trai.ch/yaml-schema-router/internal/config"
 )
@@ -18,6 +19,7 @@ const componentName = "Registry"
 // Registry manages a persistent disk cache for JSON schemas.
 type Registry struct {
 	baseDir string
+	timeout time.Duration
 }
 
 type compositeSchema struct {
@@ -36,7 +38,7 @@ func NewRegistry() (*Registry, error) {
 		return nil, fmt.Errorf("could not create cache dir: %w", err)
 	}
 
-	return &Registry{baseDir: baseDir}, nil
+	return &Registry{baseDir: baseDir, timeout: config.DefaultDownloaderTimeout}, nil
 }
 
 // NewRegistryAt initializes a registry with an explicit base directory.
@@ -45,7 +47,12 @@ func NewRegistryAt(baseDir string) (*Registry, error) {
 	if err := os.MkdirAll(baseDir, config.DefaultDirPerm); err != nil {
 		return nil, fmt.Errorf("could not create cache dir: %w", err)
 	}
-	return &Registry{baseDir: baseDir}, nil
+	return &Registry{baseDir: baseDir, timeout: config.DefaultDownloaderTimeout}, nil
+}
+
+// SetTimeout overrides the HTTP download timeout for this registry.
+func (r *Registry) SetTimeout(d time.Duration) {
+	r.timeout = d
 }
 
 // GetSchemaURI checks if the schema exists on disk. If not, it attempts to
@@ -62,7 +69,7 @@ func (r *Registry) GetSchemaURI(remoteURL, cachePath string) (string, error) {
 	log.Printf("[%s] Cache miss: %s. Downloading from %s ...", componentName, cachePath, remoteURL)
 
 	// Cache miss: download the schema
-	data, err := download(remoteURL)
+	data, err := download(remoteURL, r.timeout)
 	if err != nil {
 		// Return the error instead of falling back blindly
 		return "", fmt.Errorf("failed to download %s: %w", remoteURL, err)

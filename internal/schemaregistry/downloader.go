@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"go.trai.ch/yaml-schema-router/internal/config"
+	"time"
 )
 
 // download fetches the raw bytes from a given URL with a strict timeout.
-func download(url string) ([]byte, error) {
+func download(url string, timeout time.Duration) ([]byte, error) {
 	client := &http.Client{
-		Timeout: config.DefaultDownloaderTimeout,
+		Timeout: timeout,
 	}
 
 	resp, err := client.Get(url)

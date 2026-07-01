@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -54,6 +55,7 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			viper.SetEnvPrefix("YAML_SCHEMA_ROUTER")
+			viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 			viper.AutomaticEnv()
 
 			cfgFile := filepath.Join(mustUserConfigDir(), config.DefaultConfigDirName, "config.yaml")
@@ -176,6 +178,7 @@ func runProxy(cfg config.ProxyConfig) error {
 	if err != nil {
 		return fmt.Errorf("schema registry: %w", err)
 	}
+	registry.SetTimeout(cfg.DownloadTimeout)
 
 	k8sDetector := &kubernetes.K8sDetector{
 		Registry:          registry,
