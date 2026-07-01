@@ -184,13 +184,14 @@ func runProxy(cfg config.ProxyConfig) error {
 		SchemaFlavour:     cfg.K8sSchemaFlavour,
 	}
 	crdDetector := &kubernetes.CRDDetector{
-		Registry:             registry,
-		CRDSchemaRegistryURL: cfg.CRDSchemaRegistry,
-		K8sSchemaRegistryURL: cfg.K8sSchemaRegistry,
-		K8sSchemaVersion:     cfg.K8sSchemaVersion,
-		K8sSchemaFlavour:     cfg.K8sSchemaFlavour,
-		LocalSchemaDir:       cfg.CRDSchemaDir,
-		FallbackRemote:       cfg.CRDFallbackRemote,
+		Registry:              registry,
+		CRDSchemaRegistryURL:  cfg.CRDSchemaRegistry,
+		K8sSchemaRegistryURL:  cfg.K8sSchemaRegistry,
+		K8sSchemaVersion:      cfg.K8sSchemaVersion,
+		K8sSchemaFlavour:      cfg.K8sSchemaFlavour,
+		K8sMetaSchemaFileName: config.DefaultK8sMetaSchemaFileName,
+		LocalSchemaDir:        cfg.CRDSchemaDir,
+		FallbackRemote:        cfg.CRDFallbackRemote,
 	}
 	chain := detector.NewChain(k8sDetector, crdDetector)
 	proxy := lspproxy.NewProxy(cfg.LspPath, chain, registry, cfg)
