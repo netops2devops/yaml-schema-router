@@ -1,3 +1,52 @@
-.direnv
-assets/*.gif
+# === Go Binaries and Outputs ===
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# === Go Test Artifacts ===
+*.test
+*.out
+*.coverprofile
+profile.cov
+coverage.txt
+
+# === macOS Specific Files ===
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+*.dmg
+
+# === IDEs / Editors ===
+.idea/
+.vscode/
+*.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# === Environment Variables ===
+.env
+.env.local
+.envrc
+
+# === AI agent ===
+.claude
+.codex
+
+# === Log files ===
+*.log
+
+yaml-schema-router
