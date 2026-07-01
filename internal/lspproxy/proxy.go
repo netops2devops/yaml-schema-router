@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"sync"
 
+	"go.trai.ch/yaml-schema-router/internal/config"
 	"go.trai.ch/yaml-schema-router/internal/detector"
 	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
 )
@@ -33,10 +34,14 @@ type Proxy struct {
 	// schemaState tracks URI -> applied Schema URL to prevent redundant updates
 	schemaState map[string]string
 	stateMutex  sync.RWMutex
+
+	hover      bool
+	completion bool
+	validation bool
 }
 
 // NewProxy initializes the structs and prepares the subprocess.
-func NewProxy(lspPath string, chain *detector.Chain, registry *schemaregistry.Registry) *Proxy {
+func NewProxy(lspPath string, chain *detector.Chain, registry *schemaregistry.Registry, cfg config.ProxyConfig) *Proxy {
 	return &Proxy{
 		editorIn:      os.Stdin,
 		editorOut:     os.Stdout,
@@ -44,6 +49,9 @@ func NewProxy(lspPath string, chain *detector.Chain, registry *schemaregistry.Re
 		detectorChain: chain,
 		registry:      registry,
 		schemaState:   make(map[string]string),
+		hover:         cfg.Hover,
+		completion:    cfg.Completion,
+		validation:    cfg.Validation,
 	}
 }
 

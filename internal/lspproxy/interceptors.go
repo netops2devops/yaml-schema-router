@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
-
-	"go.trai.ch/yaml-schema-router/internal/config"
 )
 
 const maxSchemaScanLines = 10
@@ -43,7 +41,7 @@ func (p *Proxy) interceptWorkspaceConfiguration(msg *BaseRPC, payload []byte) []
 		return payload
 	}
 
-	modified := injectFeatureDefaults(yamlConfig)
+	modified := p.injectFeatureDefaults(yamlConfig)
 
 	groupedSchemas := p.getGroupedSchemas()
 
@@ -79,12 +77,12 @@ func (p *Proxy) interceptWorkspaceConfiguration(msg *BaseRPC, payload []byte) []
 	return modifiedPayload
 }
 
-func injectFeatureDefaults(yamlConfig map[string]any) bool {
+func (p *Proxy) injectFeatureDefaults(yamlConfig map[string]any) bool {
 	modified := false
 	featureDefaults := map[string]bool{
-		"hover":      config.DefaultHover,
-		"completion": config.DefaultCompletion,
-		"validation": config.DefaultValidation,
+		"hover":      p.hover,
+		"completion": p.completion,
+		"validation": p.validation,
 	}
 
 	// Inject defaults only if the key does not already exist in the user's config.
