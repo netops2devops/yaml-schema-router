@@ -60,13 +60,14 @@ func TestCRDDetectorLocalStoreHit(t *testing.T) {
 	seedObjectMeta(t, reg, "v1.33.0", "-standalone-strict")
 
 	d := &kubernetes.CRDDetector{
-		Registry:             reg,
-		CRDSchemaRegistryURL: "http://should-not-be-called.invalid",
-		K8sSchemaRegistryURL: "http://should-not-be-called.invalid",
-		K8sSchemaVersion:     "v1.33.0",
-		K8sSchemaFlavour:     "-standalone-strict",
-		LocalSchemaDir:       localDir,
-		FallbackRemote:       false,
+		Registry:              reg,
+		CRDSchemaRegistryURL:  "http://should-not-be-called.invalid",
+		K8sSchemaRegistryURL:  "http://should-not-be-called.invalid",
+		K8sSchemaVersion:      "v1.33.0",
+		K8sSchemaFlavour:      "-standalone-strict",
+		K8sMetaSchemaFileName: config.DefaultK8sMetaSchemaFileName,
+		LocalSchemaDir:        localDir,
+		FallbackRemote:        false,
 	}
 
 	urls, err := d.Detect("file:///test.yaml", []byte(minimalCRDYAML))
@@ -111,13 +112,14 @@ func TestCRDDetectorNoLocalStoreUsesRemote(t *testing.T) {
 	defer srv.Close()
 
 	d := &kubernetes.CRDDetector{
-		Registry:             reg,
-		CRDSchemaRegistryURL: srv.URL,
-		K8sSchemaRegistryURL: srv.URL,
-		K8sSchemaVersion:     "v1.33.0",
-		K8sSchemaFlavour:     "-standalone-strict",
-		LocalSchemaDir:       "", // disabled — should go straight to remote
-		FallbackRemote:       true,
+		Registry:              reg,
+		CRDSchemaRegistryURL:  srv.URL,
+		K8sSchemaRegistryURL:  srv.URL,
+		K8sSchemaVersion:      "v1.33.0",
+		K8sSchemaFlavour:      "-standalone-strict",
+		K8sMetaSchemaFileName: config.DefaultK8sMetaSchemaFileName,
+		LocalSchemaDir:        "", // disabled — should go straight to remote
+		FallbackRemote:        true,
 	}
 
 	urls, err := d.Detect("file:///test.yaml", []byte(minimalCRDYAML))

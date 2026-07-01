@@ -85,7 +85,7 @@ func run() error {
 	}
 
 	k8sDetector := &kubernetes.K8sDetector{Registry: registry, SchemaRegistryURL: config.DefaultK8sSchemaRegistry, SchemaVersion: config.DefaultK8sSchemaVersion, SchemaFlavour: config.DefaultK8sSchemaFlavour}
-	crdDetector := &kubernetes.CRDDetector{Registry: registry, CRDSchemaRegistryURL: config.DefaultCRDSchemaRegistry, K8sSchemaRegistryURL: config.DefaultK8sSchemaRegistry, K8sSchemaVersion: config.DefaultK8sSchemaVersion, K8sSchemaFlavour: config.DefaultK8sSchemaFlavour, FallbackRemote: true}
+	crdDetector := &kubernetes.CRDDetector{Registry: registry, CRDSchemaRegistryURL: config.DefaultCRDSchemaRegistry, K8sSchemaRegistryURL: config.DefaultK8sSchemaRegistry, K8sSchemaVersion: config.DefaultK8sSchemaVersion, K8sSchemaFlavour: config.DefaultK8sSchemaFlavour, K8sMetaSchemaFileName: config.DefaultK8sMetaSchemaFileName, FallbackRemote: true}
 	chain := detector.NewChain(k8sDetector, crdDetector)
 
 	proxy := lspproxy.NewProxy(*lspPath, chain, registry)

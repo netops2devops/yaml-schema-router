@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
 	"go.trai.ch/yaml-schema-router/internal/detector"
 	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
 )
@@ -32,13 +31,14 @@ type schemaWrapper struct {
 
 // CRDDetector implements the detector.Detector interface for Kubernetes CRDs.
 type CRDDetector struct {
-	Registry             *schemaregistry.Registry
-	CRDSchemaRegistryURL string
-	K8sSchemaRegistryURL string
-	K8sSchemaVersion     string
-	K8sSchemaFlavour     string
-	LocalSchemaDir       string
-	FallbackRemote       bool
+	Registry              *schemaregistry.Registry
+	CRDSchemaRegistryURL  string
+	K8sSchemaRegistryURL  string
+	K8sSchemaVersion      string
+	K8sSchemaFlavour      string
+	K8sMetaSchemaFileName string
+	LocalSchemaDir        string
+	FallbackRemote        bool
 }
 
 var _ detector.Detector = (*CRDDetector)(nil)
@@ -102,11 +102,11 @@ func (d *CRDDetector) fetchDependencies(group, fileName string) (localBaseCRDURI
 	}
 
 	versionDir := fmt.Sprintf("%s%s", d.K8sSchemaVersion, d.K8sSchemaFlavour)
-	objectMetaURL, err := url.JoinPath(d.K8sSchemaRegistryURL, versionDir, config.DefaultK8sMetaSchemaFileName)
+	objectMetaURL, err := url.JoinPath(d.K8sSchemaRegistryURL, versionDir, d.K8sMetaSchemaFileName)
 	if err != nil {
 		return "", "", err
 	}
-	metaCachePath := filepath.Join(K8sDetectorName, versionDir, config.DefaultK8sMetaSchemaFileName)
+	metaCachePath := filepath.Join(K8sDetectorName, versionDir, d.K8sMetaSchemaFileName)
 	localObjectMetaURI, err = d.Registry.GetSchemaURI(objectMetaURL, metaCachePath)
 	if err != nil {
 		return "", "", fmt.Errorf("ObjectMeta schema: %w", err)
