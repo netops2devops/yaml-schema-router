@@ -1,0 +1,94 @@
+# yaml-schema-router configuration
+#
+# Place this file at: ~/.config/yaml-schema-router/config.yaml
+#
+# Precedence (highest to lowest):
+#   CLI flag > environment variable (YAML_SCHEMA_ROUTER_<KEY>) > this file > compiled default
+#
+# Environment variable names use uppercase and underscores, e.g.:
+#   YAML_SCHEMA_ROUTER_K8S_SCHEMA_VERSION=v1.32.0
+
+# ---------------------------------------------------------------------------
+# Proxy settings (yaml-schema-router)
+# ---------------------------------------------------------------------------
+
+# Path to the yaml-language-server executable.
+# Default: yaml-language-server (resolved from PATH)
+# lsp-path: yaml-language-server
+
+# Path to write proxy logs. Set to empty string to log to stderr.
+# Default: ~/.config/yaml-schema-router/router.log
+# log-file: ~/.config/yaml-schema-router/router.log
+
+# Path to a local CRD schema store populated by `yaml-schema-router fetch`.
+# Leave empty to disable local store lookup (schemas fetched from remote only).
+# Default: "" (disabled)
+# crd-schema-dir: ~/.local/crdschema
+
+# When crd-schema-dir is set and a schema is not found there, fall back to
+# fetching it from the remote CRD registry (crd-schema-registry).
+# Default: true
+# crd-fallback-remote: true
+
+# ---------------------------------------------------------------------------
+# LSP feature toggles
+# ---------------------------------------------------------------------------
+
+# Enable hover documentation support in the language server.
+# Default: true
+# hover: true
+
+# Enable auto-completion support in the language server.
+# Default: true
+# completion: true
+
+# Enable YAML validation in the language server.
+# Default: true
+# validation: true
+
+# ---------------------------------------------------------------------------
+# Kubernetes schema registry (built-in resource types)
+# ---------------------------------------------------------------------------
+
+# Base URL for the Kubernetes JSON schema registry.
+# Default: https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master
+# k8s-schema-registry: https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master
+
+# Kubernetes API version to use for built-in resource schemas.
+# Default: v1.33.0
+# k8s-schema-version: v1.33.0
+
+# Schema flavour suffix appended to the version directory name.
+# -standalone-strict embeds all $refs and enforces no extra properties.
+# Default: -standalone-strict
+# k8s-schema-flavour: -standalone-strict
+
+# ---------------------------------------------------------------------------
+# CRD schema registry (custom resource types)
+# ---------------------------------------------------------------------------
+
+# Base URL for the CRD schema registry (datreeio/CRDs-catalog).
+# Only used when crd-fallback-remote is true (or crd-schema-dir is not set).
+# Default: https://raw.githubusercontent.com/datreeio/CRDs-catalog/main
+# crd-schema-registry: https://raw.githubusercontent.com/datreeio/CRDs-catalog/main
+
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
+
+# Timeout for individual schema download requests.
+# Accepts Go duration strings: 500ms, 5s, 1m, etc.
+# Default: 2s
+# download-timeout: 2s
+
+# ---------------------------------------------------------------------------
+# fetch subcommand settings (yaml-schema-router fetch)
+# ---------------------------------------------------------------------------
+
+# Path to the kubeconfig file used to connect to the cluster.
+# Default: ~/.kube/config
+# kubeconfig: ~/.kube/config
+
+# Directory where fetched CRD schemas are written.
+# Default: ~/.local/crdschema
+# output-dir: ~/.local/crdschema
