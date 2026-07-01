@@ -3,8 +3,10 @@ package fetcher_test
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -90,7 +92,16 @@ func TestRunSkipsCRDWithNoSchema(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(outDir, "**", "*.json"))
+	var matches []string
+	_ = filepath.WalkDir(outDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(path, ".json") {
+			matches = append(matches, path)
+		}
+		return nil
+	})
 	if len(matches) != 0 {
 		t.Errorf("expected no files, got: %v", matches)
 	}

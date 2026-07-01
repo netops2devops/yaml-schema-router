@@ -85,7 +85,7 @@ func writeCRD(outputDir string, crd apiextensionsv1.CustomResourceDefinition) er
 	}
 
 	schema := map[string]any{
-		"$schema": "http://json-schema.org",
+		"$schema": "https://json-schema.org/draft-07/schema#",
 		"title":   crd.Spec.Names.Kind,
 		"type":    "object",
 		"properties": map[string]any{
