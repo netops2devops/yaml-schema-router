@@ -39,6 +39,15 @@ func NewRegistry() (*Registry, error) {
 	return &Registry{baseDir: baseDir}, nil
 }
 
+// NewRegistryAt initializes a registry with an explicit base directory.
+// Useful for testing without touching the user's real cache.
+func NewRegistryAt(baseDir string) (*Registry, error) {
+	if err := os.MkdirAll(baseDir, config.DefaultDirPerm); err != nil {
+		return nil, fmt.Errorf("could not create cache dir: %w", err)
+	}
+	return &Registry{baseDir: baseDir}, nil
+}
+
 // GetSchemaURI checks if the schema exists on disk. If not, it attempts to
 // download it. Returns a file:// URI on success, or an error if it fails.
 func (r *Registry) GetSchemaURI(remoteURL, cachePath string) (string, error) {
