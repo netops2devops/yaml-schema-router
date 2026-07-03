@@ -77,9 +77,9 @@ func newRootCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.ProxyConfig{
-				LogFile:           viper.GetString("log-file"),
+				LogFile:           expandTilde(viper.GetString("log-file")),
 				LspPath:           viper.GetString("lsp-path"),
-				CRDSchemaDir:      viper.GetString("crd-schema-dir"),
+				CRDSchemaDir:      expandTilde(viper.GetString("crd-schema-dir")),
 				CRDFallbackRemote: viper.GetBool("crd-fallback-remote"),
 				K8sSchemaRegistry: viper.GetString("k8s-schema-registry"),
 				K8sSchemaVersion:  viper.GetString("k8s-schema-version"),
@@ -136,8 +136,8 @@ func newFetchCmd() *cobra.Command {
 				return cmd.Help()
 			}
 			cfg := config.FetchConfig{
-				Kubeconfig: viper.GetString("kubeconfig"),
-				OutputDir:  viper.GetString("output-dir"),
+				Kubeconfig: expandTilde(viper.GetString("kubeconfig")),
+				OutputDir:  expandTilde(viper.GetString("output-dir")),
 				All:        viper.GetBool("all"),
 				CRDName:    viper.GetString("crd"),
 			}
@@ -174,7 +174,13 @@ func runProxy(cfg config.ProxyConfig) error {
 
 	log.Printf("[%s] Starting yaml-schema-router. LSP: %s", componentName, cfg.LspPath)
 
-	registry, err := schemaregistry.NewRegistry()
+	var registry *schemaregistry.Registry
+	var err error
+	if cfg.CRDSchemaDir != "" {
+		registry, err = schemaregistry.NewRegistryAt(cfg.CRDSchemaDir)
+	} else {
+		registry, err = schemaregistry.NewRegistry()
+	}
 	if err != nil {
 		return fmt.Errorf("schema registry: %w", err)
 	}
@@ -225,9 +231,22 @@ func setupLogging(logFile string) error {
 }
 
 func mustUserConfigDir() string {
-	dir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return os.TempDir()
 	}
-	return dir
+	return filepath.Join(homeDir, ".config")
+}
+
+// expandTilde replaces a leading "~/" with the user's home directory.
+// Viper does not expand tildes, so paths from config files need this treatment.
+func expandTilde(path string) string {
+	if !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(homeDir, path[2:])
 }
