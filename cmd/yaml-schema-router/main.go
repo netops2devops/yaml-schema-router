@@ -128,18 +128,23 @@ func newFetchCmd() *cobra.Command {
 	defaultOutputDir := filepath.Join(homeDir, ".local", "crdschema")
 
 	cmd := &cobra.Command{
-		Use:          "fetch",
+		Use:          "fetch [kind]",
 		Short:        "Download CRD schemas from the active Kubernetes cluster",
 		SilenceUsage: true,
+		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !cmd.Flags().Changed("all") && !cmd.Flags().Changed("crd") {
+			crdName := expandTilde(viper.GetString("crd"))
+			if len(args) > 0 && crdName == "" {
+				crdName = args[0]
+			}
+			if !cmd.Flags().Changed("all") && crdName == "" {
 				return cmd.Help()
 			}
 			cfg := config.FetchConfig{
 				Kubeconfig: expandTilde(viper.GetString("kubeconfig")),
 				OutputDir:  expandTilde(viper.GetString("output-dir")),
 				All:        viper.GetBool("all"),
-				CRDName:    viper.GetString("crd"),
+				CRDName:    crdName,
 			}
 			return fetcher.Run(cfg)
 		},

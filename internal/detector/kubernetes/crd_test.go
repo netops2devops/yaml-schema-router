@@ -18,6 +18,12 @@ metadata:
   name: test
 `
 
+const builtinCRDYAML = `apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: test.example.com
+`
+
 // buildRegistry creates a real registry pointing at a temp dir.
 func buildRegistry(t *testing.T) *schemaregistry.Registry {
 	t.Helper()
@@ -128,6 +134,86 @@ func TestCRDDetectorNoLocalStoreUsesRemote(t *testing.T) {
 	}
 	if len(urls) == 0 {
 		t.Error("expected a schema URL from the remote server")
+	}
+}
+
+func TestBuiltinCRDLocalStoreHit(t *testing.T) {
+	localDir := t.TempDir()
+	reg := buildRegistry(t)
+	seedLocalStore(t, localDir, "apiextensions.k8s.io", "customresourcedefinition_v1.json")
+
+	d := &kubernetes.CRDDetector{
+		Registry:       reg,
+		LocalSchemaDir: localDir,
+		FallbackRemote: false,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(builtinCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) == 0 {
+		t.Fatal("expected a schema URL for CustomResourceDefinition, got none")
+	}
+}
+
+func TestBuiltinCRDNoLocalStoreReturnsNothing(t *testing.T) {
+	reg := buildRegistry(t)
+
+	d := &kubernetes.CRDDetector{
+		Registry:       reg,
+		LocalSchemaDir: "", // disabled
+		FallbackRemote: false,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(builtinCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 0 {
+		t.Errorf("expected no URLs when local store is disabled, got: %v", urls)
+	}
+}
+
+func TestBuiltinCRDLocalStoreMissingFileReturnsNothing(t *testing.T) {
+	reg := buildRegistry(t)
+
+	d := &kubernetes.CRDDetector{
+		Registry:       reg,
+		LocalSchemaDir: t.TempDir(), // exists but empty — schema file not present
+		FallbackRemote: true,         // remote fallback must NOT be attempted for built-in types
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(builtinCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 0 {
+		t.Errorf("expected no URLs when built-in schema absent from local store, got: %v", urls)
+	}
+}
+
+func TestBuiltinCRDCacheHitSkipsLocalStore(t *testing.T) {
+	reg := buildRegistry(t)
+
+	// Pre-seed the registry cache directly (simulates a warm cache from a prior run).
+	cachePath := filepath.Join(kubernetes.CRDDetectorName, "apiextensions.k8s.io", "customresourcedefinition_v1.json")
+	if err := reg.SaveLocalSchema(cachePath, []byte(`{"type":"object"}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	d := &kubernetes.CRDDetector{
+		Registry:       reg,
+		LocalSchemaDir: t.TempDir(), // empty — schema not here, but cache hit should precede this check
+		FallbackRemote: false,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(builtinCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) == 0 {
+		t.Error("expected schema URL from registry cache, got none")
 	}
 }
 

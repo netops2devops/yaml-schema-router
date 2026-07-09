@@ -92,6 +92,8 @@ Adapts the logic from `github.com/netops2devops/crdschema` with two changes:
 1. **Storage version only** — iterates `crd.Spec.Versions` and picks the entry where `storage: true` (not `Versions[0]`).
 2. **Proxy filename format** — writes `<output-dir>/<group>/<kind_lowercase>_<version>.json` instead of `group/version/Kind.json`.
 
+Additionally handles the built-in `CustomResourceDefinition` resource (see [Built-in CRD Schema](#built-in-crd-schema) below).
+
 Prints per-schema progress to stdout and a summary line on completion.
 
 ### Updated `CRDDetector` (internal/detector/kubernetes/crd.go)
@@ -177,12 +179,61 @@ validation: true
 
 ### Fetch Subcommand Flags
 
+```
+yaml-schema-router fetch [kind] [flags]
+```
+
+`[kind]` is an optional positional argument — a synonym for `--crd`. If both are supplied, `--crd` wins. If neither `--all` nor a kind/`--crd` value is given, the command prints usage and exits.
+
 | Flag | Default | Description |
 |---|---|---|
 | `--kubeconfig` | `~/.kube/config` | Path to kubeconfig |
 | `--output-dir` / `-o` | `~/.local/crdschema` | Where to write schemas |
-| `--all` | `false` | Download all CRDs |
-| `--crd` | `""` | Single CRD by full name or kind |
+| `--all` | `false` | Download all CRDs plus the built-in `CustomResourceDefinition` schema |
+| `--crd` | `""` | Single CRD by full name or kind; also accepts the built-in names listed below |
+
+**Built-in name aliases** (all case-insensitive):
+- `CustomResourceDefinition`
+- `CustomResourceDefinitions`
+- `CustomResourceDefinitions.apiextensions.k8s.io`
+
+---
+
+## Built-in CRD Schema
+
+`CustomResourceDefinition` (`apiextensions.k8s.io/v1`) is a first-class Kubernetes type, not a user-defined CRD. Its schema lives in the cluster's OpenAPI v3 endpoint at `/openapi/v3/apis/apiextensions.k8s.io/v1`, not in the CRD object list returned by `apiextensionsclient`.
+
+### Fetch Behaviour
+
+- `fetch --all` downloads all user-defined CRD schemas **and** the built-in `CustomResourceDefinition` schema.
+- `fetch CustomResourceDefinitions` (or any built-in alias) downloads **only** the built-in schema, skipping the CRD list entirely.
+- A failure to fetch the built-in schema is non-fatal: the error is logged to stderr and the command continues.
+
+### Schema Conversion (OpenAPI v3 → JSON Schema draft-07)
+
+The OpenAPI v3 document from `/openapi/v3/apis/apiextensions.k8s.io/v1` uses `components.schemas` with `$ref: "#/components/schemas/..."`. The output file must be JSON Schema draft-07. The conversion:
+
+1. Rewrite all `"#/components/schemas/` occurrences to `"#/definitions/`.
+2. Move the entire `components.schemas` map into a top-level `definitions` object.
+3. Set `"$ref"` at the root to point at the `CustomResourceDefinition` entry in `definitions`.
+4. Add `"$schema": "https://json-schema.org/draft-07/schema#"`.
+
+This pattern (`$ref` root + flat `definitions`) avoids dangling refs: cross-schema refs such as `CustomResourceDefinitionList.items` pointing at `CustomResourceDefinition` remain valid because both schemas live in the same `definitions` block.
+
+### Output Path
+
+```
+<output-dir>/apiextensions.k8s.io/customresourcedefinition_v1.json
+```
+
+### Remaining Gap
+
+As of this feature, the `fetch` command writes the built-in schema correctly, but the proxy's detector chain does not yet route `apiVersion: apiextensions.k8s.io/v1 / kind: CustomResourceDefinition` manifests to this file:
+
+- `K8sDetector` hard-codes a skip for `kind == "CustomResourceDefinition"` (`k8s.go:60`).
+- `CRDDetector` skips all groups ending in `k8s.io` (`crd.go:62`).
+
+Routing `CustomResourceDefinition` manifests through the proxy to the fetched schema is a follow-up task.
 
 ---
 
@@ -197,7 +248,8 @@ validation: true
 | Cluster unreachable during `fetch` | Fatal immediately, kubeconfig path shown |
 | Single CRD write fails during `fetch` | Log error, continue to next CRD |
 | kubeconfig not found | Fatal with path shown |
-| Neither `--all` nor `--crd` provided to `fetch` | Print usage, exit 0 |
+| Neither `--all` nor `--crd` nor positional kind provided to `fetch` | Print usage, exit 0 |
+| Built-in CRD schema fetch fails (cluster unreachable, path not found) | Log to stderr, continue; counted as 0 in summary |
 
 ---
 
@@ -214,12 +266,15 @@ Table-driven tests for the new lookup flow:
 
 ### `internal/fetcher/fetcher_test.go`
 
-Unit tests using a fake `apiextensions` client:
+Unit tests using a fake `apiextensions` client and a `mockBuiltinFetcher`:
 
 - Only the version with `storage: true` is written
 - CRDs with no `OpenAPIV3Schema` are skipped
 - Output filename matches proxy format (`<kind_lowercase>_<version>.json`)
 - `--crd` filtering by full name and by kind both work
+- `--all` writes both user CRD schemas and the built-in `customresourcedefinition_v1.json`
+- `fetch CustomResourceDefinitions` writes only the built-in schema; user CRD list is never consulted
+- Built-in schema output contains no `#/components/schemas/` refs and uses `#/definitions/` throughout
 
 ---
 
@@ -229,6 +284,8 @@ Fetched schemas are written by the `fetch` command and read by the proxy's `CRDD
 
 ```
 ~/.local/crdschema/                              ← OutputDir (configurable)
+  apiextensions.k8s.io/
+    customresourcedefinition_v1.json             ← built-in schema (from OpenAPI v3)
   cilium.io/
     ciliumbgpclusterconfig_v2alpha1.json
   monitoring.coreos.com/

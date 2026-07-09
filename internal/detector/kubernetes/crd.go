@@ -59,7 +59,19 @@ func (d *CRDDetector) Detect(_ string, content []byte) ([]string, error) {
 
 	for _, meta := range metas {
 		group, version, found := strings.Cut(meta.APIVersion, "/")
-		if !found || (!strings.Contains(group, ".") || strings.HasSuffix(group, "k8s.io")) {
+		if !found || !strings.Contains(group, ".") {
+			continue
+		}
+
+		// k8s.io groups are built-in Kubernetes types, not user-defined CRDs.
+		// apiextensions.k8s.io is the one exception: its schema can be fetched
+		// via "yaml-schema-router fetch" and served directly from the local store.
+		if strings.HasSuffix(group, "k8s.io") {
+			if group == "apiextensions.k8s.io" {
+				if uri := d.resolveDirectFromLocalStore(group, meta.Kind, version); uri != "" {
+					schemaURLs = append(schemaURLs, uri)
+				}
+			}
 			continue
 		}
 
@@ -140,6 +152,37 @@ func (d *CRDDetector) resolveBaseCRDSchema(group, fileName string) (string, erro
 		return "", err
 	}
 	return d.Registry.GetSchemaURI(remoteURL, cachePath)
+}
+
+// resolveDirectFromLocalStore serves a schema straight from the local store without
+// generating an ObjectMeta wrapper. Used for built-in k8s types whose fetched schemas
+// are already self-contained (they include all definitions from the cluster's OpenAPI v3 doc).
+func (d *CRDDetector) resolveDirectFromLocalStore(group, kind, version string) string {
+	if d.LocalSchemaDir == "" {
+		return ""
+	}
+	kindLower := strings.ToLower(kind)
+	fileName := fmt.Sprintf("%s_%s.json", kindLower, version)
+	cachePath := filepath.Join(d.Name(), group, fileName)
+
+	if _, err := os.Stat(d.Registry.GetLocalPath(cachePath)); err == nil {
+		log.Printf("[%s] Cache hit for built-in %s/%s", d.Name(), group, fileName)
+		return d.Registry.GetLocalFileURI(cachePath)
+	}
+
+	localPath := filepath.Join(d.LocalSchemaDir, group, fileName)
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		log.Printf("[%s] Built-in schema not found at %s; run 'yaml-schema-router fetch %s'", d.Name(), localPath, kind)
+		return ""
+	}
+
+	log.Printf("[%s] Local store hit for built-in: %s", d.Name(), localPath)
+	if saveErr := d.Registry.SaveLocalSchema(cachePath, data); saveErr != nil {
+		log.Printf("[%s] Failed to cache built-in schema: %v", d.Name(), saveErr)
+		return ""
+	}
+	return d.Registry.GetLocalFileURI(cachePath)
 }
 
 func (d *CRDDetector) generateAndSaveWrapper(localBaseCRDURI, localObjectMetaURI, wrapperCachePath string) (string, error) {
