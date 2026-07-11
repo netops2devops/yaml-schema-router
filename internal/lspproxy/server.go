@@ -25,6 +25,7 @@ func (p *Proxy) processServerToEditor() {
 
 		// Intercept and optionally rewrite the payload
 		modifiedPayload := p.forceFullSync(payload)
+		modifiedPayload = FixCompletionIndentation(modifiedPayload)
 
 		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(modifiedPayload))
 		if _, err := p.editorOut.Write([]byte(header)); err != nil {
