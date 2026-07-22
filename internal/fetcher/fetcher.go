@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
 )
 
 const (

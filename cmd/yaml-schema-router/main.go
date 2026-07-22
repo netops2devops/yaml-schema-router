@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
-	"go.trai.ch/yaml-schema-router/internal/detector"
-	"go.trai.ch/yaml-schema-router/internal/detector/kubernetes"
-	"go.trai.ch/yaml-schema-router/internal/fetcher"
-	"go.trai.ch/yaml-schema-router/internal/lspproxy"
-	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/detector"
+	"github.com/netops2devops/yaml-schema-router/internal/detector/kubernetes"
+	"github.com/netops2devops/yaml-schema-router/internal/fetcher"
+	"github.com/netops2devops/yaml-schema-router/internal/lspproxy"
+	"github.com/netops2devops/yaml-schema-router/internal/schemaregistry"
 )
 
 const componentName = "Main"

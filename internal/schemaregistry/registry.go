@@ -11,7 +11,7 @@ import (
 	"sort"
 	"time"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
 )
 
 const componentName = "Registry"

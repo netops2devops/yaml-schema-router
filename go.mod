@@ -1,4 +1,4 @@
-module go.trai.ch/yaml-schema-router
+module github.com/netops2devops/yaml-schema-router
 
 go 1.26.0
 

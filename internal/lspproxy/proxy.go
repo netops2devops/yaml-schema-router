@@ -11,9 +11,9 @@ import (
 	"os/exec"
 	"sync"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
-	"go.trai.ch/yaml-schema-router/internal/detector"
-	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/detector"
+	"github.com/netops2devops/yaml-schema-router/internal/schemaregistry"
 )
 
 const componentName = "Proxy"

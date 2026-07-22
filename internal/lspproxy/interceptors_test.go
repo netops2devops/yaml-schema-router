@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"go.trai.ch/yaml-schema-router/internal/lspproxy"
+	"github.com/netops2devops/yaml-schema-router/internal/lspproxy"
 )
 
 // realWorldCompletionPayload is a captured textDocument/completion response

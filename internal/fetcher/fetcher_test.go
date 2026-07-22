@@ -15,8 +15,8 @@ import (
 	fakeclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
-	"go.trai.ch/yaml-schema-router/internal/fetcher"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/fetcher"
 )
 
 // minimalOpenAPIDoc is a trimmed OpenAPI v3 document that exercises cross-schema $ref
