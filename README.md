@@ -2,7 +2,6 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/traiproject/yaml-schema-router)](https://github.com/traiproject/yaml-schema-router/releases/latest)
 [![CI](https://github.com/traiproject/yaml-schema-router/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/traiproject/yaml-schema-router/actions/workflows/ci.yaml)
-[![Go Report Card](https://goreportcard.com/badge/go.trai.ch/yaml-schema-router)](https://goreportcard.com/report/go.trai.ch/yaml-schema-router)
 
 <table width="100%">
   <tr>
@@ -25,8 +24,8 @@
 
 When using the
 [`yaml-language-server`](https://github.com/redhat-developer/yaml-language-server)
-outside of VSCode (in editors like Helix or Neovim), getting accurate validation
-for specific YAML formats is notoriously frustrating.
+outside of VSCode (in editors like Helix or Neovim or Zed), getting accurate validation
+for specific YAML schemas (specially Kubernetes) is notoriously frustrating.
 
 Most editors rely on simple file extensions or static glob patterns to assign
 schemas. If you map a blanket schema to your files, you often get strict
@@ -123,23 +122,6 @@ curl -fsSL https://raw.githubusercontent.com/traiproject/yaml-schema-router/refs
 > If the script is ran without sudo ensure the installation directory is added
 > to your system's `PATH`.
 
-### Windows
-
-Open **PowerShell** and run the following command to download and extract the
-latest release into your user profile (`%LOCALAPPDATA%\yaml-schema-router`):
-
-```powershell
-irm https://raw.githubusercontent.com/traiproject/yaml-schema-router/refs/heads/main/scripts/install.ps1 | iex
-```
-
-**Troubleshooting "Execution of scripts is disabled":** If Windows blocks the
-script from running, you need to temporarily bypass your execution policy. Run
-this command first, then try the installation command again:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-```
-
 ### Manual Installation (All Platforms)
 
 If you prefer not to use the automated scripts, you can download the
@@ -231,6 +213,25 @@ args = [
 hover = false
 completion = false
 validation = false
+```
+
+### Zed editor
+
+```json
+"lsp": {
+"yaml-language-server": {
+    "binary": {
+    "path": "path/to/bin/yaml-schema-router",
+    "ignore_system_version": true,
+    },
+    "settings": {
+    "yaml": {
+        "format": {
+        "completion": true
+      },
+    },
+  },
+}
 ```
 
 ## Network & Firewall Configuration
