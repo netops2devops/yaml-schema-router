@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.trai.ch/yaml-schema-router/internal/detector"
-	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
+	"github.com/netops2devops/yaml-schema-router/internal/detector"
+	"github.com/netops2devops/yaml-schema-router/internal/schemaregistry"
 )
 
 // K8sDetector implements the detector.Detector interface for Kubernetes manifests.
@@ -70,12 +70,25 @@ func (d *K8sDetector) resolveSchemaURL(meta typeMeta) string {
 		version = parts[1]
 	}
 
-	// If the group contains a dot but doesn't end with k8s.io, it is a custom resource.
-	if strings.Contains(group, ".") && !strings.HasSuffix(group, "k8s.io") {
-		log.Printf("[%s] Ignoring Custom Resource (group: %s)", d.Name(), group)
+	// Any group with a domain (e.g. "networking.k8s.io" or "gateway.networking.k8s.io")
+	// is handled by CRDDetector instead: only it knows how to fall back from the
+	// built-in registry to a local store or the CRD catalog. A dot-suffixed "k8s.io"
+	// group is not necessarily part of core Kubernetes — SIG extension APIs like
+	// Gateway API follow the same naming convention without shipping in kube-apiserver.
+	if strings.Contains(group, ".") {
+		log.Printf("[%s] Ignoring namespaced API group (group: %s); handled by %s", d.Name(), group, CRDDetectorName)
 		return ""
 	}
 
+	return resolveBuiltinSchemaURL(d.Registry, d.SchemaRegistryURL, d.SchemaVersion, d.SchemaFlavour, d.Name(), group, version, meta.Kind)
+}
+
+// resolveBuiltinSchemaURL builds and fetches a schema URL from the built-in Kubernetes
+// schema registry (e.g. yannh/kubernetes-json-schema) for the given group/version/kind.
+// Shared between K8sDetector (core groups) and CRDDetector (k8s.io-suffixed groups that
+// turn out to be true core types, e.g. "rbac.authorization.k8s.io"). Returns "" if the
+// schema can't be resolved.
+func resolveBuiltinSchemaURL(registry *schemaregistry.Registry, registryURL, schemaVersion, schemaFlavour, callerName, group, version, kind string) string {
 	// Standardize the API group name for the schema registry by stripping the domain
 	// e.g., "rbac.authorization.k8s.io" -> "rbac", "networking.k8s.io" -> "networking"
 	formattedGroup := group
@@ -90,20 +103,21 @@ func (d *K8sDetector) resolveSchemaURL(meta typeMeta) string {
 		apiVersionFormatted = formattedGroup // For core groups like "v1"
 	}
 
-	kindFormatted := strings.ToLower(meta.Kind)
+	kindFormatted := strings.ToLower(kind)
 	fileName := fmt.Sprintf("%s-%s.json", kindFormatted, apiVersionFormatted)
-	versionDir := fmt.Sprintf("%s%s", d.SchemaVersion, d.SchemaFlavour)
+	versionDir := fmt.Sprintf("%s%s", schemaVersion, schemaFlavour)
 
-	remoteSchemaURL, err := url.JoinPath(d.SchemaRegistryURL, versionDir, fileName)
+	remoteSchemaURL, err := url.JoinPath(registryURL, versionDir, fileName)
 	if err != nil {
-		log.Printf("[%s] Failed to build URL for %s: %v", d.Name(), meta.Kind, err)
+		log.Printf("[%s] Failed to build built-in schema URL for %s: %v", callerName, kind, err)
 		return ""
 	}
 
-	cachePath := filepath.Join(d.Name(), versionDir, fileName)
-	localURI, err := d.Registry.GetSchemaURI(remoteSchemaURL, cachePath)
+	// Cache path is always rooted at K8sDetectorName so both detectors share one cache entry.
+	cachePath := filepath.Join(K8sDetectorName, versionDir, fileName)
+	localURI, err := registry.GetSchemaURI(remoteSchemaURL, cachePath)
 	if err != nil {
-		log.Printf("[%s] Failed to fetch schema for %s: %v", d.Name(), meta.Kind, err)
+		log.Printf("[%s] Failed to fetch built-in schema for %s: %v", callerName, kind, err)
 		return ""
 	}
 

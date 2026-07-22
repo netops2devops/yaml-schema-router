@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.trai.ch/yaml-schema-router/internal/config"
-	"go.trai.ch/yaml-schema-router/internal/detector/kubernetes"
-	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
+	"github.com/netops2devops/yaml-schema-router/internal/config"
+	"github.com/netops2devops/yaml-schema-router/internal/detector/kubernetes"
+	"github.com/netops2devops/yaml-schema-router/internal/schemaregistry"
 )
 
 const minimalCRDYAML = `apiVersion: cilium.io/v2alpha1
@@ -22,6 +22,15 @@ const builtinCRDYAML = `apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: test.example.com
+`
+
+// gatewayCRDYAML represents a Gateway API object: its group ends in "k8s.io" by
+// naming convention, but it's a SIG extension API shipped as a CRD, not a core
+// Kubernetes type. It's never in the built-in registry.
+const gatewayCRDYAML = `apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test
 `
 
 // buildRegistry creates a real registry pointing at a temp dir.
@@ -181,7 +190,7 @@ func TestBuiltinCRDLocalStoreMissingFileReturnsNothing(t *testing.T) {
 	d := &kubernetes.CRDDetector{
 		Registry:       reg,
 		LocalSchemaDir: t.TempDir(), // exists but empty — schema file not present
-		FallbackRemote: true,         // remote fallback must NOT be attempted for built-in types
+		FallbackRemote: true,        // no registry URLs set, so builtin/catalog fallback can't resolve anything
 	}
 
 	urls, err := d.Detect("file:///test.yaml", []byte(builtinCRDYAML))
@@ -189,7 +198,104 @@ func TestBuiltinCRDLocalStoreMissingFileReturnsNothing(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(urls) != 0 {
-		t.Errorf("expected no URLs when built-in schema absent from local store, got: %v", urls)
+		t.Errorf("expected no URLs when built-in schema absent from local store and no registry URLs configured, got: %v", urls)
+	}
+}
+
+// TestK8sIOGroupLocalStoreHit covers the Gateway API case: its group
+// ("gateway.networking.k8s.io") ends in "k8s.io" but it's a SIG extension API,
+// not a core type. A schema present in the local CRD store must be served
+// directly, without ever consulting the built-in registry or CRD catalog.
+func TestK8sIOGroupLocalStoreHit(t *testing.T) {
+	localDir := t.TempDir()
+	reg := buildRegistry(t)
+	seedLocalStore(t, localDir, "gateway.networking.k8s.io", "gateway_v1.json")
+
+	d := &kubernetes.CRDDetector{
+		Registry:             reg,
+		CRDSchemaRegistryURL: "http://should-not-be-called.invalid",
+		K8sSchemaRegistryURL: "http://should-not-be-called.invalid",
+		K8sSchemaVersion:     "v1.33.0",
+		K8sSchemaFlavour:     "-standalone-strict",
+		LocalSchemaDir:       localDir,
+		FallbackRemote:       false,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(gatewayCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 1 {
+		t.Fatalf("expected exactly one schema URL served directly from local store, got: %v", urls)
+	}
+}
+
+// TestK8sIOGroupUsesBuiltinRegistryWhenLocalStoreMisses covers a group that
+// really is core Kubernetes (e.g. "rbac.authorization.k8s.io"): when it's not
+// in the local store, it should resolve from the built-in registry and never
+// reach the CRD catalog.
+func TestK8sIOGroupUsesBuiltinRegistryWhenLocalStoreMisses(t *testing.T) {
+	reg := buildRegistry(t)
+
+	builtinSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"type":"object"}`))
+	}))
+	defer builtinSrv.Close()
+
+	d := &kubernetes.CRDDetector{
+		Registry:             reg,
+		CRDSchemaRegistryURL: "http://should-not-be-called.invalid",
+		K8sSchemaRegistryURL: builtinSrv.URL,
+		K8sSchemaVersion:     "v1.33.0",
+		K8sSchemaFlavour:     "-standalone-strict",
+		LocalSchemaDir:       "", // disabled — force straight past the local-store check
+		FallbackRemote:       true,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(gatewayCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 1 {
+		t.Fatalf("expected one schema URL from the built-in registry, got: %v", urls)
+	}
+}
+
+// TestK8sIOGroupFallsBackToCRDCatalogOnBuiltinMiss covers the Gateway API case
+// when nothing is cached locally: the built-in registry 404s (it's not a core
+// type), so it must fall back to the CRD catalog + ObjectMeta wrapper flow,
+// same as any other custom resource.
+func TestK8sIOGroupFallsBackToCRDCatalogOnBuiltinMiss(t *testing.T) {
+	reg := buildRegistry(t)
+	seedObjectMeta(t, reg, "v1.33.0", "-standalone-strict")
+
+	builtinSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer builtinSrv.Close()
+
+	catalogSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"type":"object","properties":{"spec":{"type":"object"}}}`))
+	}))
+	defer catalogSrv.Close()
+
+	d := &kubernetes.CRDDetector{
+		Registry:              reg,
+		CRDSchemaRegistryURL:  catalogSrv.URL,
+		K8sSchemaRegistryURL:  builtinSrv.URL,
+		K8sSchemaVersion:      "v1.33.0",
+		K8sSchemaFlavour:      "-standalone-strict",
+		K8sMetaSchemaFileName: config.DefaultK8sMetaSchemaFileName,
+		LocalSchemaDir:        "", // disabled — force straight past the local-store check
+		FallbackRemote:        true,
+	}
+
+	urls, err := d.Detect("file:///test.yaml", []byte(gatewayCRDYAML))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 1 {
+		t.Fatalf("expected a wrapped schema URL from the CRD catalog fallback, got: %v", urls)
 	}
 }
 

@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.trai.ch/yaml-schema-router/internal/detector"
-	"go.trai.ch/yaml-schema-router/internal/schemaregistry"
+	"github.com/netops2devops/yaml-schema-router/internal/detector"
+	"github.com/netops2devops/yaml-schema-router/internal/schemaregistry"
 )
 
 type schemaRef struct {
@@ -63,16 +63,15 @@ func (d *CRDDetector) Detect(_ string, content []byte) ([]string, error) {
 			continue
 		}
 
-		// k8s.io groups are built-in Kubernetes types, not user-defined CRDs.
-		// apiextensions.k8s.io is the one exception: its schema can be fetched
-		// via "yaml-schema-router fetch" and served directly from the local store.
+		// A "k8s.io"-suffixed group might be a true core Kubernetes type, or it might be
+		// a SIG extension API (Gateway API, etc.) that only follows the naming convention.
+		// Try, in order: schema already in the local CRD store, the built-in registry,
+		// then fall through below to the CRD catalog like any other custom resource.
 		if strings.HasSuffix(group, "k8s.io") {
-			if group == "apiextensions.k8s.io" {
-				if uri := d.resolveDirectFromLocalStore(group, meta.Kind, version); uri != "" {
-					schemaURLs = append(schemaURLs, uri)
-				}
+			if uri := d.resolveDirectFromLocalStore(group, meta.Kind, version); uri != "" {
+				schemaURLs = append(schemaURLs, uri)
+				continue
 			}
-			continue
 		}
 
 		log.Printf("[%s] Detected Custom Resource: %s/%s", d.Name(), group, meta.Kind)
@@ -85,6 +84,14 @@ func (d *CRDDetector) Detect(_ string, content []byte) ([]string, error) {
 			log.Printf("[%s] Wrapper cache hit for %s", d.Name(), wrapperCachePath)
 			schemaURLs = append(schemaURLs, d.Registry.GetLocalFileURI(wrapperCachePath))
 			continue
+		}
+
+		if strings.HasSuffix(group, "k8s.io") {
+			if uri := resolveBuiltinSchemaURL(d.Registry, d.K8sSchemaRegistryURL, d.K8sSchemaVersion, d.K8sSchemaFlavour, d.Name(), group, version, meta.Kind); uri != "" {
+				schemaURLs = append(schemaURLs, uri)
+				continue
+			}
+			log.Printf("[%s] No built-in schema for %s/%s; falling back to CRD catalog", d.Name(), group, meta.Kind)
 		}
 
 		log.Printf("[%s] Wrapper cache miss. Fetching dependencies...", d.Name())
